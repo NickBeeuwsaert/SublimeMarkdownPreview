@@ -14,20 +14,37 @@ mistletoe = importlib.import_module("mistletoe")
 markdown_map = defaultdict(dict)
 
 
+class MarkdownPreview:
+    def __init__(self, view, sheet):
+        self.view = view
+        self.sheet = sheet
+
+    def update(self):
+        self.sheet.set_contents(
+            mistletoe.markdown(self.view.substr(sublime.Region(0, self.view.size())))
+        )
+
+    def close(self):
+        self.sheet.close()
+
+    def should_close(self, view):
+        return view.sheet() not in (self.view.sheet(), self.sheet)
+
+
 class MarkdownPreviewCommand(sublime_plugin.TextCommand):
     def run(self, edit):
-        if "markdown" not in self.view.syntax().scope:
+        view = self.view
+        if "markdown" not in view.syntax().scope:
             return
 
-        if self.view in markdown_map[self.view.window()]:
+        if view in markdown_map[view.window()]:
             return
-        sheet = self.view.window().new_html_sheet(
-            f"Preview",
-            mistletoe.markdown(self.view.substr(sublime.Region(0, self.view.size()))),
-        )
-        self.view.window().select_sheets([self.view.sheet(), sheet])
-        self.view.window().focus_view(self.view)
-        markdown_map[self.view.window()][self.view] = sheet
+        sheet = view.window().new_html_sheet(f"Preview", "")
+        view.window().select_sheets([view.sheet(), sheet])
+        view.window().focus_view(view)
+        preview = MarkdownPreview(self.view, sheet)
+        preview.update()
+        markdown_map[view.window()][view] = preview
 
     def is_enabled(self):
         return "markdown" in self.view.syntax().scope
@@ -36,20 +53,17 @@ class MarkdownPreviewCommand(sublime_plugin.TextCommand):
 class MarkdownViewUpdate(sublime_plugin.ViewEventListener):
     def on_activated(self):
         window = self.view.window()
-        remove_views = []
-        for view, sheet in markdown_map[window].items():
-            if self.view.sheet() not in (view.sheet(), sheet):
-                remove_views.append(view)
-                sheet.close()
-        for view in remove_views:
-            markdown_map[window].pop(view)
+        for view, preview in list(markdown_map[window].items()):
+            if preview.should_close(self.view):
+                preview.close()
+                markdown_map[window].pop(view)
 
 
 class MarkdownView2Update(sublime_plugin.TextChangeListener):
     def on_text_changed(self, changes):
         markdown_views = markdown_map[self.buffer.primary_view().window()]
         for view in self.buffer.views():
-            if view in markdown_views:
-                markdown_views[view].set_contents(
-                    mistletoe.markdown(view.substr(sublime.Region(0, view.size())))
-                )
+            try:
+                markdown_views[view].update()
+            except KeyError:
+                pass
