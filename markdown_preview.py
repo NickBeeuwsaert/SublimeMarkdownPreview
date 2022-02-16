@@ -9,7 +9,17 @@ import sublime_plugin
 here = str(Path(__file__).parent)
 if here not in sys.path:
     sys.path.append(here)
-mistletoe = importlib.import_module("mistletoe")
+
+mistune = importlib.import_module("mistune")
+sublime_task_lists = importlib.import_module("sublime_task_lists")
+importlib.reload(sublime_task_lists)
+
+plugin_sublime_task_lists = sublime_task_lists.plugin_sublime_task_lists
+
+markdown = mistune.create_markdown(
+    renderer="html",
+    plugins=["footnotes", "strikethrough", "table", plugin_sublime_task_lists],
+)
 
 markdown_map = defaultdict(dict)
 
@@ -21,7 +31,7 @@ class MarkdownPreview:
 
     def update(self):
         self.sheet.set_contents(
-            mistletoe.markdown(self.view.substr(sublime.Region(0, self.view.size())))
+            markdown(self.view.substr(sublime.Region(0, self.view.size())))
         )
 
     def close(self):
