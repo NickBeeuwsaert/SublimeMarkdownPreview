@@ -2,12 +2,11 @@ import functools
 import html
 import operator
 
-from mistune import HTMLRenderer, create_markdown
-from mistune.renderers import AstRenderer, BaseRenderer
-
 
 class Ast2HTML:
-    INLINE_ELEMENTS = ("strong", "emphasis", "link", "codespan")
+    """
+    Transform mistunes AST into a minihtml-compatible format.
+    """
 
     def newline(self):
         return ""
@@ -133,9 +132,6 @@ class Ast2HTML:
     def emphasis(self, children):
         return f'<em>{"".join(self.transform(**child) for child in children)}</em>'
 
-    def strikethrough(self, children):
-        return f'<s>{"".join(self.transform(**child) for child in children)}</s>'
-
     def strong(self, children):
         return (
             f'<strong>{"".join(self.transform(**child) for child in children)}</strong>'
@@ -170,7 +166,7 @@ class Ast2HTML:
 
     def block_code(self, text, info):
         NL = "\n"
-        return f'<div style="background-color: #333; border-radius: 0.25em; padding: 0.25em; border: 1px solid black; display: inline-block"><pre><code>{html.escape(text).rstrip().replace(NL, "<br/>")}</code></pre></div>'
+        return f'<div style="background-color: #333; border-radius: 0.25em; padding: 0.25em; border: 1px solid black; display: inline-block"><pre><code>{html.escape(text).replace(NL, "<br/>")}</code></pre></div>'
 
     def block_quote(self, children):
         NL = "\n"
@@ -192,10 +188,10 @@ class Ast2HTML:
         return f'<li>{checkbox} {"".join(self.transform(**child) for child in children)}</li>'
 
     def footnote_item(self, children, key, index):
-        return f'<div>[{key}]: <div style="display: inline-block">{"".join(self.transform(**child) for child in children)}</div></div><br/>'
+        return f'<div>[{html.escape(key)}]: <div style="display: inline-block">{"".join(self.transform(**child) for child in children)}</div></div><br/>'
 
     def footnote_ref(self, key, index):
-        return f'<div style="display: inline; font-size: 0.75em; position: relative; top: -0.75em">[{key}]</div>'
+        return f'<div style="display: inline; font-size: 0.75em; position: relative; top: -0.75em">[{htmll.escape(key)}]</div>'
 
     def footnotes(self, children, **kwargs):
         return "".join(self.transform(**child) for child in children)
@@ -204,99 +200,3 @@ class Ast2HTML:
         if hasattr(self, type):
             return getattr(self, type)(**kwargs)
         return f"UNHANDLED: {type}"
-
-
-class MiniHTMLRenderer(BaseRenderer):
-    NAME = "html"
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._fallbacks = {}
-
-    def table_head(self, children):
-        return dict(type="table_head", children=children)
-
-    def table_cell(self, children, align=None, is_head=False):
-        return dict(type="table_cell", children=children, align=align, is_head=is_head)
-
-    def table_row(self, children):
-        return dict(type="table_row", children=children)
-
-    def table_body(self, children):
-        return dict(type="table_body", children=children)
-
-    def table(self, children):
-        return dict(type="table", children=children)
-
-    def text(self, text):
-        return dict(type="text", text=text)
-
-    def link(self, link, children=None, title=None):
-        return dict(
-            type="link",
-            link=link,
-            children=self.text(children) if isinstance(children, str) else children,
-            title=title,
-        )
-
-    def image(self, src, alt="", title=None):
-        return dict(type="image", src=src, alt=alt, title=title)
-
-    def codespan(self, text):
-        return dict(type="codespan", text=text)
-
-    def linebreak(self):
-        return dict(type="linebreak")
-
-    def inline_html(self, html):
-        return dict(type="html", html=html)
-
-    def heading(self, children, level):
-        return dict(type="heading", children=children, level=level)
-
-    def newline(self):
-        return dict(type="newline")
-
-    def thematic_break(self):
-        return dict(type="thematic_break")
-
-    def block_code(self, children, info=None):
-        return dict(type="block_code", children=children, info=info)
-
-    def block_html(self, children):
-        return dict(type="block_html", text=children)
-
-    def block_text(self, children):
-        return dict(type="block_text", children=children)
-
-    def block_quote(self, children):
-        return dict(type="block_quote", children=children)
-
-    def emphasis(self, children):
-        return dict(type="emphasis", children=children)
-
-    def strong(self, children):
-        return dict(type="strong", children=children)
-
-    def paragraph(self, children):
-        return dict(type="paragraph", children=children)
-
-    def list(self, children, ordered, level, start=None):
-        return dict(
-            type="list",
-            children=list(children),
-            ordered=ordered,
-            level=level,
-            start=start,
-        )
-
-    def list_item(self, children, level):
-        return dict(type="list_item", children=children, level=level)
-
-    def task_list_item(self, children, level, checked):
-        return dict(
-            type="task_list_item", children=children, level=level, checked=checked
-        )
-
-    def finalize(self, data):
-        return list(data)

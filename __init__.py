@@ -3,25 +3,17 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-import sublime
-import sublime_plugin
+import sublime  # type: ignore
+import sublime_plugin  # type: ignore
 
-here = str(Path(__file__).parent)
-if here not in sys.path:
-    sys.path.append(here)
+from . import lib
+from .vendor import mistune
 
-mistune = importlib.import_module("mistune")
-sublime_task_lists = importlib.import_module("sublime_task_lists")
-renderer = importlib.import_module("renderer")
-importlib.reload(sublime_task_lists)
-importlib.reload(renderer)
-
-plugin_sublime_task_lists = sublime_task_lists.plugin_sublime_task_lists
+importlib.reload(lib)
 
 _markdown = mistune.create_markdown(
     renderer=mistune.AstRenderer(),
-    plugins=["footnotes", "table", plugin_sublime_task_lists],
-    # plugins=["table"],
+    plugins=["footnotes", "table", "task_lists"],
 )
 
 TEMPLATE = """
@@ -39,12 +31,9 @@ TEMPLATE = """
 
 def markdown(source):
     ast = _markdown(source)
-    transformer = renderer.Ast2HTML()
+    transformer = lib.Ast2HTML()
 
     return "\n".join(transformer.transform(**child) for child in ast)
-
-
-# markdown_map = defaultdict(dict)
 
 
 class SheetProxy:
@@ -62,23 +51,6 @@ class SheetProxy:
 
 
 sheet_proxy = SheetProxy()
-
-
-class MarkdownPreview:
-    def __init__(self, view, sheet):
-        self.view = view
-        self.sheet = sheet
-
-    def update(self):
-        self.sheet.set_contents(
-            markdown(self.view.substr(sublime.Region(0, self.view.size())))
-        )
-
-    def close(self):
-        self.sheet.close()
-
-    def should_close(self, view):
-        return view.sheet() not in (self.view.sheet(), self.sheet)
 
 
 class MarkdownPreviewCommand(sublime_plugin.TextCommand):
@@ -108,12 +80,6 @@ class MarkdownViewUpdate(sublime_plugin.ViewEventListener):
     counter = 0
     sheet = sheet_proxy
 
-    # def on_activated(self):
-    #     window = self.view.window()
-    #     for view, preview in list(markdown_map[window].items()):
-    #         if preview.should_close(self.view):
-    #             preview.close()
-    #             markdown_map[window].pop(view)
     def on_deactivated(self):
         if self.sheet:
             self.sheet.close()
@@ -127,7 +93,7 @@ class MarkdownViewUpdate(sublime_plugin.ViewEventListener):
         sheet = self.sheet
         if sheet is None:
             return
-        # padding-left: 0.5em; border-left: 0.25em solid gray"
+
         sheet.set_contents(
             TEMPLATE.format(
                 content=markdown(self.view.substr(sublime.Region(0, self.view.size())))
