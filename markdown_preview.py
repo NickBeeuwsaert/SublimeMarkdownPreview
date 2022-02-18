@@ -12,16 +12,56 @@ if here not in sys.path:
 
 mistune = importlib.import_module("mistune")
 sublime_task_lists = importlib.import_module("sublime_task_lists")
+renderer = importlib.import_module("renderer")
 importlib.reload(sublime_task_lists)
+importlib.reload(renderer)
 
 plugin_sublime_task_lists = sublime_task_lists.plugin_sublime_task_lists
 
-markdown = mistune.create_markdown(
-    renderer="html",
-    plugins=["footnotes", "strikethrough", "table", plugin_sublime_task_lists],
+_markdown = mistune.create_markdown(
+    renderer=mistune.AstRenderer(),
+    plugins=["footnotes", "table", plugin_sublime_task_lists],
+    # plugins=["table"],
 )
 
-markdown_map = defaultdict(dict)
+TEMPLATE = """
+    <body>
+        <style type="text/css">
+            .blockquote p {{
+                padding-left: 0.5em;
+                border-left: 0.25em solid gray;
+            }}
+        </style>
+        {content}
+    </body>
+"""
+
+
+def markdown(source):
+    ast = _markdown(source)
+    transformer = renderer.Ast2HTML()
+
+    return "\n".join(transformer.transform(**child) for child in ast)
+
+
+# markdown_map = defaultdict(dict)
+
+
+class SheetProxy:
+    def __init__(self):
+        self._map = {}
+
+    def associate(self, view, sheet):
+        self._map[view] = sheet
+
+    def disassociate(self, view):
+        self._map.pop(view, None)
+
+    def __get__(self, instance, owner=None):
+        return self._map.get(instance.view)
+
+
+sheet_proxy = SheetProxy()
 
 
 class MarkdownPreview:
@@ -42,38 +82,54 @@ class MarkdownPreview:
 
 
 class MarkdownPreviewCommand(sublime_plugin.TextCommand):
+    sheet = sheet_proxy
+
     def run(self, edit):
         view = self.view
         if "markdown" not in view.syntax().scope:
             return
 
-        if view in markdown_map[view.window()]:
+        if self.sheet:
             return
-        sheet = view.window().new_html_sheet(f"Preview", "")
+        content = markdown(self.view.substr(sublime.Region(0, self.view.size())))
+        sheet = view.window().new_html_sheet(
+            f"Preview",
+            TEMPLATE.format(content=content),
+        )
         view.window().select_sheets([view.sheet(), sheet])
         view.window().focus_view(view)
-        preview = MarkdownPreview(self.view, sheet)
-        preview.update()
-        markdown_map[view.window()][view] = preview
+        sheet_proxy.associate(view, sheet)
 
     def is_enabled(self):
         return "markdown" in self.view.syntax().scope
 
 
 class MarkdownViewUpdate(sublime_plugin.ViewEventListener):
-    def on_activated(self):
-        window = self.view.window()
-        for view, preview in list(markdown_map[window].items()):
-            if preview.should_close(self.view):
-                preview.close()
-                markdown_map[window].pop(view)
+    counter = 0
+    sheet = sheet_proxy
 
+    # def on_activated(self):
+    #     window = self.view.window()
+    #     for view, preview in list(markdown_map[window].items()):
+    #         if preview.should_close(self.view):
+    #             preview.close()
+    #             markdown_map[window].pop(view)
+    def on_deactivated(self):
+        if self.sheet:
+            self.sheet.close()
+        sheet_proxy.disassociate(self.view)
 
-class MarkdownView2Update(sublime_plugin.TextChangeListener):
-    def on_text_changed(self, changes):
-        markdown_views = markdown_map[self.buffer.primary_view().window()]
-        for view in self.buffer.views():
-            try:
-                markdown_views[view].update()
-            except KeyError:
-                pass
+    # For some reason this isn't firing
+    # def on_text_changed(self, changes):
+    #     pass
+
+    def on_selection_modified(self):
+        sheet = self.sheet
+        if sheet is None:
+            return
+        # padding-left: 0.5em; border-left: 0.25em solid gray"
+        sheet.set_contents(
+            TEMPLATE.format(
+                content=markdown(self.view.substr(sublime.Region(0, self.view.size())))
+            )
+        )
