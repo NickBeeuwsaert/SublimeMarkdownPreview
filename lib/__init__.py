@@ -1,6 +1,12 @@
 import functools
 import html
 import operator
+from textwrap import dedent
+
+NL = "\n"
+BR = "<br/>"
+BRNL = BR + NL
+NBSP = "&nbsp;"
 
 
 class Ast2HTML:
@@ -49,13 +55,13 @@ class Ast2HTML:
         content = "".join(self.transform(**child) for child in children)
         padding = width - text_width
         if align == "right":
-            content = "&nbsp;" * padding + content
+            content = NBSP * padding + content
         elif align == "center":
             lpad = padding // 2
             rpad = padding - lpad
-            content = "&nbsp;" * lpad + content + "&nbsp;" * rpad
+            content = NBSP * lpad + content + NBSP * rpad
         else:
-            content = content + "&nbsp;" * padding
+            content = content + NBSP * padding
 
         return content
 
@@ -122,12 +128,13 @@ class Ast2HTML:
                 )
 
     def table(self, *, children, **kwargs):
-        NL = "<br/>\n"
-        return f"{NL}<pre>{NL.join(self._get_table_text(children, **kwargs))}</pre>{NL}"
+        table = f"<pre>{BRNL.join(self._get_table_text(children, **kwargs))}</pre>"
+        return f"{BRNL}{table}{BRNL}"
 
     def text(self, text):
-        # Replace all spaces with a nbsp entity, since minihtml doesn't have a CSS white-space property
-        return html.escape(text).replace(" ", "&nbsp;")
+        # Replace all spaces with a nbsp entity, since minihtml
+        # doesn't have a CSS white-space property
+        return html.escape(text).replace(" ", NBSP)
 
     def emphasis(self, children):
         return f'<em>{"".join(self.transform(**child) for child in children)}</em>'
@@ -138,13 +145,27 @@ class Ast2HTML:
         )
 
     def link(self, link, children: list, title):
-        return f'<a src="{html.escape(link) }">{"".join(self.transform(**child) for child in children)}</a>'
+        return dedent(
+            f"""\
+                <a
+                    src="{html.escape(link) }"
+                >{"".join(self.transform(**child) for child in children)}</a>
+            """
+        )
 
     def image(self, src, alt, title):
-        return f'<img src="{html.escape(src)}" alt="{html.escape(alt or "")}" title="{html.escape(title or "")}"/>'
+        return dedent(
+            f"""\
+                <img
+                    src="{html.escape(src)}"
+                    alt="{html.escape(alt or "")}"
+                    title="{html.escape(title or "")}"
+                />
+            """
+        )
 
     def codespan(self, text):
-        return f'<code style="background-color: #333; border-radius: 0.25em">{html.escape(text)}</code>'
+        return f'<code class="code-span">{html.escape(text)}</code>'
 
     def linebreak(self):
         return "<br/>"
@@ -156,21 +177,34 @@ class Ast2HTML:
         return f'<p>{"".join(self.transform(**child) for child in children)}</p>'
 
     def heading(self, children, level):
-        return f"<h{level}>{''.join(self.transform(**child) for child in children)}</h{level}>"
+        tag = f"h{level}"
+        content = "".join(self.transform(**child) for child in children)
+        return f"<{tag}>{content}</{tag}>"
 
     def thematic_break(self):
-        return '<div style="border-bottom: 1px solid black; width: 100px;"></div>'
+        return '<div class="thematic-break"></div>'
 
     def block_text(self, children):
-        return "<br/>".join(self.transform(**child) for child in children)
+        text = "".join(self.transform(**child) for child in children)
+
+        return text
 
     def block_code(self, text, info):
         NL = "\n"
-        return f'<div style="background-color: #333; border-radius: 0.25em; padding: 0.25em; border: 1px solid black; display: inline-block"><pre><code>{html.escape(text).replace(NL, "<br/>")}</code></pre></div>'
+        print(repr(text))
+        return dedent(
+            f"""\
+            <div class="block-code">
+                <pre><code>
+                    {html.escape(text).rstrip(NL).replace(NL, BR)}
+                </code></pre>
+            </div>
+        """
+        )
 
     def block_quote(self, children):
         NL = "\n"
-        text = f'{"".join(self.transform(**child) for child in children if self.transform(**child)).replace(NL, "<br/>")}'
+        text = f'{"".join(self.transform(**child) for child in children)}'
 
         return f'<div class="blockquote">{text}</div>'
 
@@ -178,12 +212,13 @@ class Ast2HTML:
         return f'<ul>{"".join(self.transform(**child) for child in children)}</ul>'
 
     def list_item(self, children, level):
+        print(children)
         return f'<li>{"".join(self.transform(**child) for child in children)}</li>'
 
     def task_list_item(self, children, checked, **kwargs):
-        UNCHECKED = '<div style="width: 0.75em; height: 0.75em; display: inline-block; border: 1px solid white; line-height: 1"></div>'
-        CHECKED = '<div style="width: 0.75em; height: 0.75em; display: inline-block; border: 1px solid white; background-color: hsl(210, 70%, 50%);"></div>'
-        checkbox = CHECKED if checked else UNCHECKED
+        checked = "checked" if checked else "unchecked"
+        classes = f"task-list-item__checkbox task-list-item__checkbox--{checked}"
+        checkbox = f'<div class="{classes}"></div>'
 
         return f'<li>{checkbox} {"".join(self.transform(**child) for child in children)}</li>'
 
@@ -191,7 +226,7 @@ class Ast2HTML:
         return f'<div>[{html.escape(key)}]: <div style="display: inline-block">{"".join(self.transform(**child) for child in children)}</div></div><br/>'
 
     def footnote_ref(self, key, index):
-        return f'<div style="display: inline; font-size: 0.75em; position: relative; top: -0.75em">[{htmll.escape(key)}]</div>'
+        return f'<div class="footnote__ref">[{html.escape(key)}]</div>'
 
     def footnotes(self, children, **kwargs):
         return "".join(self.transform(**child) for child in children)

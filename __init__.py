@@ -23,6 +23,44 @@ TEMPLATE = """
                 padding-left: 0.5em;
                 border-left: 0.25em solid gray;
             }}
+
+            .task-list-item__checkbox {{
+                width: 0.75em;
+                height: 0.75em;
+                display: inline-block;
+                border: 1px solid white;
+                line-height: 1;
+            }}
+
+            .task-list-item__checkbox--checked {{
+                /* minihtml doesn't support <input/>, so we are hacking around it. */
+                background-color: hsl(210, 70%, 50%);
+            }}
+
+            .footnote__ref {{
+                display: inline;
+                font-size: 0.75em;
+                position: relative;
+                top: -0.75em;
+            }}
+
+            .block-code {{
+                background-color: #333;
+                border-radius: 0.25em;
+                padding: 0.25em;
+                border: 1px solid black;
+                display: inline-block
+            }}
+
+            .code-span {{
+                background-color: #333;
+                border-radius: 0.25em
+            }}
+
+            .thematic-break {{
+                border-bottom: 1px solid black;
+                width: 100px;
+            }}
         </style>
         {content}
     </body>
