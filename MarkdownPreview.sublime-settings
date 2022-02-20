@@ -1,0 +1,5 @@
+{
+    // Update preview 1/4 of a second after last key-stroke
+    // set to 0 or null for immediate update
+    "markdown-preview.debounce": 0.25,
+}

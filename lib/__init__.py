@@ -1,9 +1,13 @@
 import functools
 import html
+import importlib
 import operator
 from textwrap import dedent
 
-from .debounce import debounce
+from . import _debounce
+
+importlib.reload(_debounce)
+debounce = _debounce.debounce
 
 NL = "\n"
 BR = "<br/>"

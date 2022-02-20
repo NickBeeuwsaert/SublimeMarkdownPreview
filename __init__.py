@@ -17,6 +17,19 @@ _markdown = mistune.create_markdown(
     plugins=["footnotes", "table", "task_lists"],
 )
 
+
+class Settings:
+    @cached_property
+    def _settings(self):
+        return sublime.load_settings("MarkdownPreview.sublime-settings")
+
+    def get(self, key, default=None):
+        return self._settings.get(key, default)
+
+
+settings = Settings()
+
+
 TEMPLATE = """
     <style type="text/css">
         .blockquote p {{
@@ -137,7 +150,9 @@ class MarkdownViewUpdate(sublime_plugin.ViewEventListener):
     @cached_property
     def debounced_update(self):
         # debouncing updates so the preview isn't fired on every keystroke
-        return lib.debounce(0.1)(self.update)
+        return lib.debounce(lambda: settings.get("markdown-preview.debounce", 0.1))(
+            self.update
+        )
 
     # Not really happy with having to use the on_selection_modified event
     # since it also means we update on selection changes and not just
@@ -147,4 +162,7 @@ class MarkdownViewUpdate(sublime_plugin.ViewEventListener):
         if sheet is None:
             return
 
-        self.debounced_update()
+        if settings.get("markdown-preview.debounce", None):
+            self.debounced_update()
+        else:
+            self.update()

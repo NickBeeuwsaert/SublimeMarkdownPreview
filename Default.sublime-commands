@@ -1,5 +1,13 @@
 [
     {
+        "caption": "Preferences: Markdown Preview Settings",
+        "command": "edit_settings",
+        "args": {
+            "base_file": "${packages}/MarkdownPreview/MarkdownPreview.sublime-settings",
+            "default": "// Settings in here override those in \"MarkdownPreview/MarkdownPreview.sublime-settings\"\n{\n\t$0\n}\n"
+        }
+    },
+    {
         "caption": "Markdown: Open preview to the right",
         "command": "markdown_preview",
     }
