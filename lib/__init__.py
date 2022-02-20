@@ -3,6 +3,8 @@ import html
 import operator
 from textwrap import dedent
 
+from .debounce import debounce
+
 NL = "\n"
 BR = "<br/>"
 BRNL = BR + NL
@@ -191,7 +193,6 @@ class Ast2HTML:
 
     def block_code(self, text, info):
         NL = "\n"
-        print(repr(text))
         return dedent(
             f"""\
             <div class="block-code">
@@ -212,7 +213,6 @@ class Ast2HTML:
         return f'<ul>{"".join(self.transform(**child) for child in children)}</ul>'
 
     def list_item(self, children, level):
-        print(children)
         return f'<li>{"".join(self.transform(**child) for child in children)}</li>'
 
     def task_list_item(self, children, checked, **kwargs):

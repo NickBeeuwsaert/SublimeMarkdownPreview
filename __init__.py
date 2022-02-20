@@ -1,6 +1,7 @@
 import importlib
 import sys
 from collections import defaultdict
+from functools import cached_property
 from pathlib import Path
 
 import sublime  # type: ignore
@@ -17,53 +18,51 @@ _markdown = mistune.create_markdown(
 )
 
 TEMPLATE = """
-    <body>
-        <style type="text/css">
-            .blockquote p {{
-                padding-left: 0.5em;
-                border-left: 0.25em solid gray;
-            }}
+    <style type="text/css">
+        .blockquote p {{
+            padding-left: 0.5em;
+            border-left: 0.25em solid gray;
+        }}
 
-            .task-list-item__checkbox {{
-                width: 0.75em;
-                height: 0.75em;
-                display: inline-block;
-                border: 1px solid white;
-                line-height: 1;
-            }}
+        .task-list-item__checkbox {{
+            width: 0.75em;
+            height: 0.75em;
+            display: inline-block;
+            border: 1px solid white;
+            line-height: 1;
+        }}
 
-            .task-list-item__checkbox--checked {{
-                /* minihtml doesn't support <input/>, so we are hacking around it. */
-                background-color: hsl(210, 70%, 50%);
-            }}
+        .task-list-item__checkbox--checked {{
+            /* minihtml doesn't support <input/>, so we are hacking around it. */
+            background-color: hsl(210, 70%, 50%);
+        }}
 
-            .footnote__ref {{
-                display: inline;
-                font-size: 0.75em;
-                position: relative;
-                top: -0.75em;
-            }}
+        .footnote__ref {{
+            display: inline;
+            font-size: 0.75em;
+            position: relative;
+            top: -0.75em;
+        }}
 
-            .block-code {{
-                background-color: #333;
-                border-radius: 0.25em;
-                padding: 0.25em;
-                border: 1px solid black;
-                display: inline-block
-            }}
+        .block-code {{
+            background-color: #333;
+            border-radius: 0.25em;
+            padding: 0.25em;
+            border: 1px solid black;
+            display: inline-block
+        }}
 
-            .code-span {{
-                background-color: #333;
-                border-radius: 0.25em
-            }}
+        .code-span {{
+            background-color: #333;
+            border-radius: 0.25em
+        }}
 
-            .thematic-break {{
-                border-bottom: 1px solid black;
-                width: 100px;
-            }}
-        </style>
-        {content}
-    </body>
+        .thematic-break {{
+            border-bottom: 1px solid black;
+            width: 100px;
+        }}
+    </style>
+    {content}
 """
 
 
@@ -115,7 +114,6 @@ class MarkdownPreviewCommand(sublime_plugin.TextCommand):
 
 
 class MarkdownViewUpdate(sublime_plugin.ViewEventListener):
-    counter = 0
     sheet = sheet_proxy
 
     def on_deactivated(self):
@@ -127,13 +125,26 @@ class MarkdownViewUpdate(sublime_plugin.ViewEventListener):
     # def on_text_changed(self, changes):
     #     pass
 
+    def update(self):
+        if self.sheet is None:
+            return
+        self.sheet.set_contents(
+            TEMPLATE.format(
+                content=markdown(self.view.substr(sublime.Region(0, self.view.size())))
+            )
+        )
+
+    @cached_property
+    def debounced_update(self):
+        # debouncing updates so the preview isn't fired on every keystroke
+        return lib.debounce(0.1)(self.update)
+
+    # Not really happy with having to use the on_selection_modified event
+    # since it also means we update on selection changes and not just
+    # buffer changes, but on_text_changed isn't firing for me
     def on_selection_modified(self):
         sheet = self.sheet
         if sheet is None:
             return
 
-        sheet.set_contents(
-            TEMPLATE.format(
-                content=markdown(self.view.substr(sublime.Region(0, self.view.size())))
-            )
-        )
+        self.debounced_update()
